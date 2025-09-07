@@ -13,29 +13,46 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-def get_geology_from_egdi(lat: float, lng: float):
+def get_geology_from_macrostrat(lat: float, lng: float):
+    """
+    Fetches geological data from the Macrostrat open database.
+    This is a more reliable alternative to the EGDI WMS service.
+    """
     try:
-        bbox = f"{lng-0.001},{lat-0.001},{lng+0.001},{lat+0.001}"
-        url = (
-            "https://egdi.geology.cz/arcgis/services/OneGeologyEurope/OneGeologyEurope_1M/MapServer/WMSServer?"
-            "SERVICE=WMS&VERSION=1.1.1&REQUEST=GetFeatureInfo&FORMAT=application/json&TRANSPARENT=true"
-            "&QUERY_LAYERS=1&LAYERS=1&INFO_FORMAT=application/json&X=1&Y=1&SRS=EPSG:4326"
-            f"&WIDTH=1&HEIGHT=1&BBOX={bbox}"
-        )
+        url = f"https://macrostrat.org/api/geologic_units/map?lat={lat}&lng={lng}&format=json"
+        
         response = requests.get(url, timeout=10)
         response.raise_for_status()
+        
         data = response.json()
-        if data.get("features") and len(data["features"]) > 0:
-            description = data["features"][0].get("properties", {}).get("lithology", "No description available")
-            return description
+        
+        if data.get("success", {}).get("data"):
+            # Extract the name of the geological unit
+            unit_name = data["success"]["data"][0].get("name", "N/A")
+            # Extract the general description
+            description = data["success"]["data"][0].get("descrip", "No description available.")
+            
+            # Combine them for a useful result
+            return f"{unit_name} - {description}"
         else:
             return "Geological data not found at this location."
-    except Exception:
-        return "Could not connect to the geological data service (EGDI)."
+
+    except requests.exceptions.RequestException as e:
+        print(f"Error fetching data from Macrostrat: {e}")
+        return "Could not connect to the geological data service (Macrostrat)."
+    except Exception as e:
+        print(f"An unexpected error occurred: {e}")
+        return "An error occurred while processing geological data."
+
 
 @app.get("/get_geodata")
 def get_geodata_for_coords(lat: float, lng: float):
-    geological_formation = get_geology_from_egdi(lat, lng)
+    """
+    Main endpoint that gathers data from various sources.
+    """
+    # Use the new, more reliable data source
+    geological_formation = get_geology_from_macrostrat(lat, lng)
+    
     success = "Could not connect" not in geological_formation
 
     return {
