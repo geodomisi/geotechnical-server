@@ -27,8 +27,9 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, 
 
 def is_point_in_polygon(point, polygon):
     x, y, inside = point[0], point[1], False
-    for i in range(len(polygon)):
-        j = i - 1
+    vertices = len(polygon)
+    j = vertices - 1
+    for i in range(vertices):
         xi, yi = polygon[i]; xj, yj = polygon[j]
         intersect = ((yi > y) != (yj > y)) and (x < (xj - xi) * (y - yi) / (yj - yi) + xi)
         if intersect: inside = not inside
@@ -40,7 +41,7 @@ def get_seismic_data(lat, lng):
         for polygon_group in feature["geometry"]["coordinates"]:
             if is_point_in_polygon(point, polygon_group[0]):
                 return {"zone": feature["properties"]["ZONE_ID"], "pga": feature["properties"]["PGA"]}
-    return {"zone": "I", "pga": 0.16}
+    return {"zone": "I", "pga": 0.16} # Default to Zone I if not in II or III
 
 def get_geology_from_macrostrat(lat: float, lng: float):
     try:
